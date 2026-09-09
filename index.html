@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>即時匯率走勢查詢系統</title>
+  <!-- Chart.js 圖表庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PapaParse 高效 CSV 解析庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg-base: #0a0d14;
+      --bg-card: #121824;
+      --bg-card-hover: #1b2333;
+      --border-color: #232f46;
+      --text-main: #f0f4fc;
+      --text-muted: #8b9bb4;
+      --accent-blue: #00d2ff;
+      --accent-green: #00f2a9;
+      --accent-gold: #ffb800;
+      --btn-bg: #1e293b;
+      --btn-hover: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .dashboard {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* 頂部標題 */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 18px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--accent-blue);
+      border-radius: 2px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: #0f372d;
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    /* 控制面板 */
+    .controls {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      align-items: flex-end;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="date"], select {
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="date"]:focus, select:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      background: var(--btn-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover {
+      background: var(--btn-hover);
+      border-color: var(--accent-blue);
+    }
+
+    button.primary {
+      background: #0052cc;
+      border-color: #0065ff;
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: #0065ff;
+    }
+
+    button.export {
+      background: #113426;
+      border-color: #1b5e3f;
+      color: var(--accent-green);
+    }
+
+    button.export:hover {
+      background: #184b36;
+    }
+
+    /* 關鍵數據概覽卡片 */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-card .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .stat-card .value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
+    /* 圖表區塊 */
+    .chart-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+      height: 380px;
+    }
+
+    /* 資料表格 */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow-x: auto;
+      max-height: 400px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    th {
+      background: #161e2e;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    tr:hover td {
+      background: var(--bg-card-hover);
+    }
+
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 13, 20, 0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    @media (max-width: 600px) {
+      .chart-container {
+        height: 280px;
+      }
+      th, td {
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loadingOverlay">讀取匯率資料庫中...</div>
+
+  <div class="dashboard">
+    <!-- Header -->
+    <header>
+      <h1>FX Analytics 匯率走勢儀表板</h1>
+      <span class="badge" id="dataStatus">載入中...</span>
+    </header>
+
+    <!-- 查詢控制項 -->
+    <div class="controls">
+      <div class="control-group">
+        <label>開始日期</label>
+        <input type="date" id="startDate">
+      </div>
+      <div class="control-group">
+        <label>結束日期</label>
+        <input type="date" id="endDate">
+      </div>
+      <div class="control-group">
+        <label>快捷篩選</label>
+        <select id="quickFilter">
+          <option value="30">最近 30 日 (預設)</option>
+          <option value="90">最近 90 日</option>
+          <option value="180">最近 180 日</option>
+          <option value="365">最近 1 年</option>
+          <option value="all">全部歷史</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <div class="btn-row">
+          <button class="primary" id="btnFilter">套用查詢</button>
+          <button class="export" id="btnExport" title="匯出查詢結果至本機">下載 CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最新數值摘要卡片 -->
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <!-- 走勢圖 -->
+    <div class="chart-container">
+      <canvas id="fxChart"></canvas>
+    </div>
+
+    <!-- 資料明細表格 -->
+    <div class="table-container">
+      <table id="dataTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
