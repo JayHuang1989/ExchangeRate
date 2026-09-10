@@ -137,6 +137,7 @@ function onCurrencyChanged() {
   const dispName = currencyDisplayNames[activeCurrency];
   document.getElementById('thCurrencyName').innerText = `${dispName} 匯率`;
 
+  // 獲取該幣別有效資料集合
   const validData = rawData.filter(r => r[activeCurrency] !== null);
   if (validData.length === 0) {
     alert(`此幣別 (${dispName}) 目前無任何有效資料！`);
@@ -146,6 +147,7 @@ function onCurrencyChanged() {
   const minDate = validData[0][dateColName];
   const maxDate = validData[validData.length - 1][dateColName];
 
+  // 動態更新輸入框的合法最大最小值
   const sInput = document.getElementById('tab1StartDate');
   const eInput = document.getElementById('tab1EndDate');
   sInput.min = minDate;
@@ -153,9 +155,28 @@ function onCurrencyChanged() {
   eInput.min = minDate;
   eInput.max = maxDate;
 
+  // 更新 Tab 2 年度選單
   populateYearDropdown(validData);
-  applyQuickFilter(30);
 
+  // === 核心修正：保留使用者目前的快速選單選項 ===
+  const currentQuickFilter = document.getElementById('quickFilter').value;
+
+  if (currentQuickFilter === 'all') {
+    // 若當前選的是「全部歷史資料」，以該幣別的最早與最新日期為準
+    sInput.value = minDate;
+    eInput.value = maxDate;
+    executeTab1Filter();
+  } else if (!isNaN(parseInt(currentQuickFilter))) {
+    // 若當前選的是 30 / 90 / 180 / 365 日，依照該幣別重新計算對應天數
+    applyQuickFilter(parseInt(currentQuickFilter));
+  } else {
+    // 若為自訂日期，確保不超出新幣別的極限範圍
+    if (sInput.value < minDate) sInput.value = minDate;
+    if (eInput.value > maxDate) eInput.value = maxDate;
+    executeTab1Filter();
+  }
+
+  // 若當前在 Tab 2，同步更新年度統計矩陣
   if (document.getElementById('tab2').classList.contains('active')) {
     renderYearMatrix();
   }
@@ -190,6 +211,13 @@ function applyQuickFilter(days) {
 
   document.getElementById('tab1StartDate').value = validData[startIndex][dateColName];
   document.getElementById('tab1EndDate').value = validData[lastIndex][dateColName];
+  
+  // 同步下拉選單的選項
+  const qf = document.getElementById('quickFilter');
+  if (qf.value !== String(days) && qf.value !== 'all') {
+    qf.value = String(days);
+  }
+
   executeTab1Filter();
 }
 
