@@ -55,7 +55,7 @@ def main():
 
     # 設定路徑為當前 .py 所在的資料夾
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    output_filepath = os.path.join(base_dir, "rate_usd_ntd.csv")
+    output_filepath = os.path.join(base_dir, "rate_usd_twd.csv")
     # -----------------------------------------------
 
     all_data = []
@@ -107,7 +107,7 @@ def main():
     # ----------------- 寫入 CSV 檔案 -----------------
     with open(output_filepath, mode="w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow(["date", "usd_ntd_rate"])
+        writer.writerow(["date", "usd_twd_rate"])
 
         for date_str, rate_val in merged_data:
             writer.writerow([date_str, rate_val])
