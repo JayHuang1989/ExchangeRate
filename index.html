@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>即時匯率走勢查詢系統</title>
-  <!-- Chart.js 圖表庫 -->
+  <title>匯率查詢系統</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse 高效 CSV 解析庫 -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root {
@@ -19,6 +17,7 @@
       --accent-blue: #00d2ff;
       --accent-green: #00f2a9;
       --accent-gold: #ffb800;
+      --accent-red: #ff5c8a;
       --btn-bg: #1e293b;
       --btn-hover: #334155;
     }
@@ -40,20 +39,19 @@
 
     .dashboard {
       width: 100%;
-      max-width: 1200px;
+      max-width: 1300px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
     }
 
-    /* 頂部標題 */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
-      padding: 12px 18px;
+      padding: 14px 20px;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -62,7 +60,6 @@
     header h1 {
       font-size: 1.25rem;
       letter-spacing: 0.5px;
-      color: #ffffff;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -78,12 +75,117 @@
     }
 
     .badge {
-      font-size: 0.75rem;
-      padding: 3px 8px;
+      font-size: 0.8rem;
+      padding: 5px 12px;
       border-radius: 20px;
-      background: #0f372d;
+      background: #0f2b23;
       color: var(--accent-green);
+      font-weight: 500;
+      border: 1px solid #184b36;
+    }
+
+    /* 幣別單選按鈕群組 */
+    .currency-selector-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .selector-title {
+      font-size: 0.85rem;
       font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .currency-radio-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .circle-radio-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 24px;
+      font-size: 0.88rem;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .circle-radio-label:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .circle-radio-label input[type="radio"] {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--text-muted);
+      border-radius: 50%;
+      outline: none;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .circle-radio-label input[type="radio"]:checked {
+      border-color: var(--accent-blue);
+    }
+
+    .circle-radio-label input[type="radio"]:checked::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .circle-radio-label.active {
+      border-color: var(--accent-blue);
+      background: rgba(0, 210, 255, 0.08);
+      color: #fff;
+    }
+
+    /* Tab 導覽 */
+    .tab-navigation {
+      display: flex;
+      gap: 6px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom: 2px solid var(--accent-blue);
+      background: var(--bg-card);
     }
 
     /* 控制面板 */
@@ -93,7 +195,7 @@
       border-radius: 12px;
       padding: 16px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 14px;
       align-items: flex-end;
     }
@@ -108,7 +210,6 @@
       font-size: 0.8rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
 
     input[type="date"], select {
@@ -119,7 +220,6 @@
       border-radius: 8px;
       font-size: 0.9rem;
       outline: none;
-      transition: border-color 0.2s;
     }
 
     input[type="date"]:focus, select:focus {
@@ -131,7 +231,7 @@
       gap: 8px;
     }
 
-    button {
+    button.btn {
       background: var(--btn-bg);
       border: 1px solid var(--border-color);
       color: var(--text-main);
@@ -140,68 +240,86 @@
       font-size: 0.9rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: 0.2s;
       flex: 1;
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
+      text-align: center;
     }
 
-    button:hover {
+    button.btn:hover {
       background: var(--btn-hover);
       border-color: var(--accent-blue);
     }
 
-    button.primary {
+    button.btn.primary {
       background: #0052cc;
       border-color: #0065ff;
-      color: #fff;
     }
 
-    button.primary:hover {
+    button.btn.primary:hover {
       background: #0065ff;
     }
 
-    button.export {
+    button.btn.export {
       background: #113426;
       border-color: #1b5e3f;
       color: var(--accent-green);
     }
 
-    button.export:hover {
+    button.btn.export:hover {
       background: #184b36;
     }
 
-    /* 關鍵數據概覽卡片 */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
+    /* 單排自適應指標容器 */
+    .summary-grid-single-row {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 10px;
+      width: 100%;
     }
 
-    .stat-card {
+    .summary-grid-single-row .stat-card {
+      flex: 1 1 0;
+      min-width: 0;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 10px;
-      padding: 14px;
+      padding: 12px 8px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
+      text-align: center;
     }
 
-    .stat-card .label {
-      font-size: 0.75rem;
+    .summary-grid-single-row .stat-card .label {
+      font-size: 0.8rem;
       color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .stat-card .value {
+    .summary-grid-single-row .stat-card .value {
       font-size: 1.35rem;
       font-weight: 700;
-      color: var(--accent-blue);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    /* 圖表區塊 */
+    .summary-grid-single-row .stat-card .sub-date {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .quarter-stat-value {
+      color: var(--accent-blue) !important;
+    }
+
+    /* 圖表容器 */
     .chart-container {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
@@ -211,40 +329,127 @@
       height: 380px;
     }
 
-    /* 資料表格 */
-    .table-container {
+    /* 表格包覆卡片 (固定 title) */
+    .matrix-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
-      overflow-x: auto;
-      max-height: 400px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .matrix-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue) !important;
+      padding: 14px 18px;
+      background: #161e2e;
+      border-bottom: 1px solid var(--border-color);
+      width: 100%;
+    }
+
+    .table-container {
+      overflow: auto;
+      max-height: 520px;
+      width: 100%;
+    }
+
+    .tab1-table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 0.88rem;
+      font-size: 0.85rem;
     }
 
     th {
       background: #161e2e;
       color: var(--text-muted);
-      padding: 12px 16px;
+      padding: 10px 14px;
       font-weight: 600;
       position: sticky;
       top: 0;
       border-bottom: 2px solid var(--border-color);
+      white-space: nowrap;
+      z-index: 2;
     }
 
     td {
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-bottom: 1px solid var(--border-color);
       color: var(--text-main);
+      white-space: nowrap;
     }
 
     tr:hover td {
       background: var(--bg-card-hover);
+    }
+
+    /* 年度表格樣式 */
+    .matrix-table {
+      text-align: right;
+    }
+
+    .matrix-table th, .matrix-table td {
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      text-align: right;
+    }
+
+    .matrix-table th:first-child, .matrix-table td:first-child {
+      text-align: center;
+      position: sticky;
+      left: 0;
+      background: #161e2e;
+      font-weight: bold;
+      z-index: 3;
+    }
+
+    .last-valid-rate {
+      color: var(--accent-gold) !important;
+      font-weight: 700;
+    }
+
+    .matrix-table tbody tr.stat-days-row td {
+      background: #141b29;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .matrix-table tbody tr.stat-days-row td:first-child {
+      background: #182234;
+      color: var(--accent-blue);
+    }
+
+    .matrix-table tfoot td {
+      font-weight: 600;
+      background: #121b2b;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .matrix-table tfoot tr.highlight-stat td {
+      color: var(--accent-green);
+    }
+
+    .matrix-table tfoot tr.last-year-stat td {
+      color: #b0c4de;
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .tab-content.active {
+      display: flex;
     }
 
     #loadingOverlay {
@@ -260,12 +465,27 @@
       font-weight: 600;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 650px) {
+      .summary-grid-single-row {
+        gap: 6px;
+      }
+      .summary-grid-single-row .stat-card {
+        padding: 8px 4px;
+      }
+      .summary-grid-single-row .stat-card .label {
+        font-size: 0.68rem;
+      }
+      .summary-grid-single-row .stat-card .value {
+        font-size: 0.95rem;
+      }
+      .summary-grid-single-row .stat-card .sub-date {
+        font-size: 0.62rem;
+      }
       .chart-container {
         height: 280px;
       }
-      th, td {
-        padding: 8px 10px;
+      .controls {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -275,54 +495,112 @@
   <div id="loadingOverlay">讀取匯率資料庫中...</div>
 
   <div class="dashboard">
-    <!-- Header -->
     <header>
-      <h1>FX Analytics 匯率走勢儀表板</h1>
-      <span class="badge" id="dataStatus">載入中...</span>
+      <h1>匯率查詢系統</h1>
+      <span class="badge" id="dataStatus">檢查資料時間...</span>
     </header>
 
-    <!-- 查詢控制項 -->
-    <div class="controls">
-      <div class="control-group">
-        <label>開始日期</label>
-        <input type="date" id="startDate">
+    <!-- 幣別圓形選擇器 -->
+    <div class="currency-selector-card">
+      <span class="selector-title">幣別切換：</span>
+      <div class="currency-radio-group" id="currencyRadioGroup"></div>
+    </div>
+
+    <!-- 分頁導航 -->
+    <div class="tab-navigation">
+      <button class="tab-btn active" data-tab="tab1">匯率查詢</button>
+      <button class="tab-btn" data-tab="tab2">年度統計</button>
+    </div>
+
+    <!-- TAB 1: 匯率查詢 -->
+    <div class="tab-content active" id="tab1">
+      <div class="controls">
+        <div class="control-group">
+          <label>開始日期</label>
+          <input type="date" id="tab1StartDate">
+        </div>
+        <div class="control-group">
+          <label>結束日期</label>
+          <input type="date" id="tab1EndDate">
+        </div>
+        <div class="control-group">
+          <label>快速選單</label>
+          <select id="quickFilter">
+            <option value="30">最近 30 日 (預設)</option>
+            <option value="90">最近 90 日</option>
+            <option value="180">最近 180 日</option>
+            <option value="365">最近 1 年</option>
+            <option value="all">全部歷史資料</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <div class="btn-row">
+            <button class="btn primary" id="btnFilterTab1">套用查詢</button>
+            <button class="btn export" id="btnExportTab1">下載區間 CSV</button>
+          </div>
+        </div>
       </div>
-      <div class="control-group">
-        <label>結束日期</label>
-        <input type="date" id="endDate">
+
+      <!-- 4 欄統計卡片 -->
+      <div class="summary-grid-single-row" id="tab1SummaryGrid"></div>
+
+      <!-- 走勢圖 -->
+      <div class="chart-container">
+        <canvas id="fxChart"></canvas>
       </div>
-      <div class="control-group">
-        <label>快捷篩選</label>
-        <select id="quickFilter">
-          <option value="30">最近 30 日 (預設)</option>
-          <option value="90">最近 90 日</option>
-          <option value="180">最近 180 日</option>
-          <option value="365">最近 1 年</option>
-          <option value="all">全部歷史</option>
-        </select>
-      </div>
-      <div class="control-group">
-        <div class="btn-row">
-          <button class="primary" id="btnFilter">套用查詢</button>
-          <button class="export" id="btnExport" title="匯出查詢結果至本機">下載 CSV</button>
+
+      <!-- 歷史明細表格 -->
+      <div class="tab1-table-card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th id="thCurrencyName">匯率</th>
+              </tr>
+            </thead>
+            <tbody id="tab1TableBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <!-- 最新數值摘要卡片 -->
-    <div class="summary-grid" id="summaryGrid"></div>
+    <!-- TAB 2: 年度統計 -->
+    <div class="tab-content" id="tab2">
+      <div class="controls">
+        <div class="control-group" style="max-width: 250px;">
+          <label>選擇年度</label>
+          <select id="yearSelector"></select>
+        </div>
+        <div class="control-group">
+          <div class="btn-row" style="max-width: 220px;">
+            <button class="btn export" id="btnExportTab2">下載年度報表 CSV</button>
+          </div>
+        </div>
+      </div>
 
-    <!-- 走勢圖 -->
-    <div class="chart-container">
-      <canvas id="fxChart"></canvas>
-    </div>
+      <!-- 四季平均匯率卡片 (亮藍色) -->
+      <div class="summary-grid-single-row" id="tab2QuarterGrid"></div>
 
-    <!-- 資料明細表格 -->
-    <div class="table-container">
-      <table id="dataTable">
-        <thead id="tableHead"></thead>
-        <tbody id="tableBody"></tbody>
-      </table>
+      <!-- 獨立固定標題卡片 -->
+      <div class="matrix-card">
+        <div class="matrix-title" id="matrixYearTitle">匯率統計表</div>
+        <div class="table-container">
+          <table class="matrix-table" id="yearMatrixTable">
+            <thead>
+              <tr>
+                <!-- 左上角由 JS 動態填入，預設保留標籤 -->
+                <th id="thMatrixYearHeader">年份</th>
+                <th>1月</th><th>2月</th><th>3月</th><th>4月</th>
+                <th>5月</th><th>6月</th><th>7月</th><th>8月</th>
+                <th>9月</th><th>10月</th><th>11月</th><th>12月</th>
+              </tr>
+            </thead>
+            <tbody id="matrixTableBody"></tbody>
+            <tfoot id="matrixTableFoot"></tfoot>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
