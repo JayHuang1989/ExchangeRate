@@ -1,0 +1,19 @@
+# Python 相關快取
+__pycache__/
+*.pyc
+
+# 編輯器或系統暫存
+.vscode/
+.DS_Store
+
+# 機密或本地設定檔
+.env
+
+# 排除指定檔案
+*.xls
+*.xlsx
+*匯率--PESO*.xls
+*匯率--PESO*.xlsx
+
+# 排除指定資料夾
+temp/

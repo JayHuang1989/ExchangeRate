@@ -61,7 +61,7 @@ def read_rate_file(filepath):
 def read_existing_merged(filepath):
     """
     讀取既有的 rate_merge.csv，保留歷史合併資料
-    格式：{ "yyyy/mm/dd": {"ntd": rate, "cny": rate} }
+    格式：{ "yyyy/mm/dd": {"ntd": rate, "cny": rate, "php": rate} }
     """
     data = {}
     if not os.path.exists(filepath):
@@ -69,7 +69,7 @@ def read_existing_merged(filepath):
 
     with open(filepath, mode="r", encoding="utf-8-sig") as f:
         reader = csv.reader(f)
-        header = next(reader, None)  # 表頭：date, usd_ntd, usd_cny
+        header = next(reader, None)  # 表頭：date, usd_ntd, usd_cny, usd_php
 
         for row in reader:
             if len(row) >= 1:
@@ -77,7 +77,8 @@ def read_existing_merged(filepath):
                 if std_date:
                     ntd_val = row[1].strip() if len(row) > 1 else ""
                     cny_val = row[2].strip() if len(row) > 2 else ""
-                    data[std_date] = {"ntd": ntd_val, "cny": cny_val}
+                    php_val = row[3].strip() if len(row) > 3 else ""
+                    data[std_date] = {"ntd": ntd_val, "cny": cny_val, "php": php_val}
 
     print(f"-> 成功載入既有合併檔 {os.path.basename(filepath)}：共 {len(data)} 筆歷史資料")
     return data
@@ -89,6 +90,7 @@ def main():
 
     file_ntd = os.path.join(base_dir, "rate_usd_ntd.csv")
     file_cny = os.path.join(base_dir, "rate_usd_cny.csv")
+    file_php = os.path.join(base_dir, "rate_usd_php.csv")
     file_merge = os.path.join(base_dir, "rate_merge.csv")
 
     print("=== 開始執行匯率資料合併作業 ===")
@@ -96,12 +98,18 @@ def main():
     # 1. 讀取現有合併檔 (保留歷史資料)
     merged_records = read_existing_merged(file_merge)
 
-    # 2. 讀取 USD/NTD 及 USD/CNY 最新資料
+    # 2. 讀取 USD/NTD, USD/CNY 及 USD/PHP 最新資料
     ntd_records = read_rate_file(file_ntd)
     cny_records = read_rate_file(file_cny)
+    php_records = read_rate_file(file_php)
 
     # 3. 收集所有出現過的日期 (聯集)
-    all_dates = set(merged_records.keys()) | set(ntd_records.keys()) | set(cny_records.keys())
+    all_dates = (
+        set(merged_records.keys())
+        | set(ntd_records.keys())
+        | set(cny_records.keys())
+        | set(php_records.keys())
+    )
 
     if not all_dates:
         print("未獲取任何匯率資料，程式結束。")
@@ -110,28 +118,31 @@ def main():
     # 4. 更新/合併資料 (新資料覆蓋或填補舊資料)
     for d in all_dates:
         if d not in merged_records:
-            merged_records[d] = {"ntd": "", "cny": ""}
+            merged_records[d] = {"ntd": "", "cny": "", "php": ""}
 
         # 若新讀入的資料有值，則更新
         if d in ntd_records and ntd_records[d] != "":
             merged_records[d]["ntd"] = ntd_records[d]
         if d in cny_records and cny_records[d] != "":
             merged_records[d]["cny"] = cny_records[d]
+        if d in php_records and php_records[d] != "":
+            merged_records[d]["php"] = php_records[d]
 
-    # 5. 按日期 ascend (升序) 排序：因為格式統一為 yyyy/mm/dd，可以直接做字串排序
+    # 5. 按日期 ascend (升序) 排序
     sorted_dates = sorted(merged_records.keys())
 
     # 6. 輸出至 rate_merge.csv
     with open(file_merge, mode="w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        # 表頭：日期 (yyyy/mm/dd)、美元兌台幣、美元兌人民幣
-        writer.writerow(["date", "usd_ntd", "usd_cny"])
+        # 表頭：date, usd_ntd, usd_cny, usd_php
+        writer.writerow(["date", "usd_ntd", "usd_cny", "usd_php"])
 
         for d in sorted_dates:
             writer.writerow([
                 d,
-                merged_records[d]["ntd"],
-                merged_records[d]["cny"]
+                merged_records[d].get("ntd", ""),
+                merged_records[d].get("cny", ""),
+                merged_records[d].get("php", "")
             ])
 
     print(f"【合併成功】共整合 {len(sorted_dates)} 筆日期資料！")
