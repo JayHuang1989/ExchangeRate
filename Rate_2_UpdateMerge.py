@@ -97,6 +97,7 @@ def main():
 
     # 1. 讀取現有合併檔 (保留歷史資料)
     merged_records = read_existing_merged(file_merge)
+    existing_count = len(merged_records)
 
     # 2. 讀取 USD/TWD, USD/CNY 及 USD/PHP 最新資料
     twd_records = read_rate_file(file_twd)
@@ -115,38 +116,60 @@ def main():
         print("未獲取任何匯率資料，程式結束。")
         return
 
-    # 4. 更新/合併資料 (新資料覆蓋或填補舊資料)
+    # 4. 更新/合併資料並追蹤變動
+    has_changed = False
+    new_added_count = 0
+
     for d in all_dates:
         if d not in merged_records:
             merged_records[d] = {"twd": "", "cny": "", "php": ""}
+            has_changed = True
+            new_added_count += 1  # 全新日期
 
-        # 若新讀入的資料有值，則更新
+        # 檢查並更新 TWD
         if d in twd_records and twd_records[d] != "":
-            merged_records[d]["twd"] = twd_records[d]
+            if merged_records[d]["twd"] != twd_records[d]:
+                merged_records[d]["twd"] = twd_records[d]
+                has_changed = True
+        # 檢查並更新 CNY
         if d in cny_records and cny_records[d] != "":
-            merged_records[d]["cny"] = cny_records[d]
+            if merged_records[d]["cny"] != cny_records[d]:
+                merged_records[d]["cny"] = cny_records[d]
+                has_changed = True
+        # 檢查並更新 PHP
         if d in php_records and php_records[d] != "":
-            merged_records[d]["php"] = php_records[d]
+            if merged_records[d]["php"] != php_records[d]:
+                merged_records[d]["php"] = php_records[d]
+                has_changed = True
 
     # 5. 按日期 ascend (升序) 排序
     sorted_dates = sorted(merged_records.keys())
+    total_count = len(sorted_dates)
 
-    # 6. 輸出至 rate_merge.csv
-    with open(file_merge, mode="w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.writer(f)
-        # 表頭：date, usd_twd, usd_cny, usd_php
-        writer.writerow(["date", "usd_twd", "usd_cny", "usd_php"])
+    # 6. 依據是否有變動決定是否寫入檔案
+    if has_changed:
+        with open(file_merge, mode="w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            # 表頭：date, usd_twd, usd_cny, usd_php
+            writer.writerow(["date", "usd_twd", "usd_cny", "usd_php"])
 
-        for d in sorted_dates:
-            writer.writerow([
-                d,
-                merged_records[d].get("twd", ""),
-                merged_records[d].get("cny", ""),
-                merged_records[d].get("php", "")
-            ])
+            for d in sorted_dates:
+                writer.writerow([
+                    d,
+                    merged_records[d].get("twd", ""),
+                    merged_records[d].get("cny", ""),
+                    merged_records[d].get("php", "")
+                ])
 
-    print(f"【合併成功】共整合 {len(sorted_dates)} 筆日期資料！")
-    print(f"檔案已儲存至：{file_merge}")
+        print(f"【合併成功】既有資料 {existing_count} 筆，本次新增 {new_added_count} 筆，合併後 {total_count} 筆")
+        print(f"檔案已更新並儲存至：{file_merge}")
+    else:
+        print(f"【合併成功】既有資料 {existing_count} 筆，本次新增 {new_added_count} 筆，合併後 {total_count} 筆")
+        print("目前皆為既有資料，無新增或異動，檔案未更新。")
+
+    # 7. 結束前印出完成時間
+    formatted_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"===== Merge 已執行完成 {formatted_time} =====\n")
 
 
 if __name__ == "__main__":

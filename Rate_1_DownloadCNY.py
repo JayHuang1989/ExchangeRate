@@ -2,6 +2,7 @@ import csv
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import os
+import time
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests
@@ -67,23 +68,60 @@ def get_usd_cny_rates():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_file = os.path.join(current_dir, "rate_usd_cny.csv")
 
+    original_count = 0
+    new_count = 0
+    updated = False
+
     if os.path.exists(csv_file):
         df_old = pd.read_csv(csv_file)
-        # 合併後依 date 欄位去重（保留最新抓取到的資料）
-        df_merged = pd.concat([df_old, df_new]).drop_duplicates(
-            subset=["date"], keep="last"
+        original_count = len(df_old)
+
+        # 比對新舊資料以計算實際新增/變動筆數
+        merged_check = pd.merge(
+            df_new, df_old, on="date", how="left", suffixes=("_new", "_old")
         )
+        new_dates = merged_check[merged_check["usd_cny_rate_old"].isna()]
+        updated_rates = merged_check[
+            ~merged_check["usd_cny_rate_old"].isna()
+            & (
+                merged_check["usd_cny_rate_new"]
+                != merged_check["usd_cny_rate_old"]
+            )
+        ]
+        new_count = len(new_dates) + len(updated_rates)
+
+        if new_count > 0:
+            df_merged = pd.concat([df_old, df_new]).drop_duplicates(
+                subset=["date"], keep="last"
+            )
+            df_merged = df_merged.sort_values(by="date", ascending=True)
+            df_merged.to_csv(csv_file, index=False, encoding="utf-8-sig")
+            updated = True
+        else:
+            df_merged = df_old
     else:
         df_merged = df_new
+        new_count = len(df_new)
+        df_merged = df_merged.sort_values(by="date", ascending=True)
+        df_merged.to_csv(csv_file, index=False, encoding="utf-8-sig")
+        updated = True
 
-    # 依日期由小到大排序
-    df_merged = df_merged.sort_values(by="date", ascending=True)
-    df_merged.to_csv(csv_file, index=False, encoding="utf-8-sig")
+    total_count = len(df_merged)
+    latest_date = df_merged["date"].max() if not df_merged.empty else "無"
 
+    # 顯示終端機統計資訊
     print(
-        f"更新成功！目前 CSV 共有 {len(df_merged)} 筆資料，已儲存至 {csv_file}"
+        f"CSV原有資料筆數: {original_count} 筆，本次新增 {new_count} 筆，新增後 {total_count} 筆，最新資料為 {latest_date}。"
     )
 
+    if updated:
+        print(f"更新成功！已儲存至 {csv_file}")
+    else:
+        print("【提示】沒有發現新資料，CSV 檔案保持不變，未進行覆寫。")
+
+    # 顯示終端機統計資訊 (使用 time 模組)
+    formatted_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print(f"===== Download CNY 已執行完成 {formatted_time} =====\n")
 
 if __name__ == "__main__":
     get_usd_cny_rates()

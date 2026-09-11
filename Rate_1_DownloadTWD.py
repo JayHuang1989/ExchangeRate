@@ -79,8 +79,8 @@ def main():
 
     # ----------------- 讀取既有 CSV 整合資料 -----------------
     existing_data = {}
+    original_count = 0
 
-    # 若檔案已存在，先載入舊資料（以日期為 key 方便覆蓋或去重）
     if os.path.exists(output_filepath):
         with open(output_filepath, mode="r", encoding="utf-8-sig") as f:
             reader = csv.reader(f)
@@ -88,32 +88,46 @@ def main():
             for row in reader:
                 if len(row) >= 2:
                     existing_data[row[0].strip()] = row[1].strip()
+        original_count = len(existing_data)
 
-    # 將新抓取的資料併入字典（若日期重複則以最新抓到的為準）
+    # 將新抓取的資料併入字典並計算新增筆數
     new_count = 0
     for row in all_data:
         d = row["日期"]
+        r = str(row["匯率"])
         if d not in existing_data:
+            existing_data[d] = r
             new_count += 1
-        existing_data[d] = row["匯率"]
+        elif existing_data[d] != r:
+            existing_data[d] = r
+            new_count += 1
 
     # 依日期由舊到新排序 (按日期升序)
     merged_data = sorted(existing_data.items(), key=lambda x: x[0])
+    total_count = len(merged_data)
+    latest_date = merged_data[-1][0] if merged_data else "無"
 
+    # 顯示終端機統計資訊
     print(
-        f"\n資料整併完畢！原先有 {len(existing_data) - new_count} 筆，本次新增 {new_count} 筆，總計 {len(merged_data)} 筆。"
+        f"CSV原有資料筆數: {original_count} 筆，本次新增 {new_count} 筆，新增後 {total_count} 筆，最新資料為 {latest_date}。"
     )
 
     # ----------------- 寫入 CSV 檔案 -----------------
-    with open(output_filepath, mode="w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.writer(f)
-        writer.writerow(["date", "usd_twd_rate"])
+    if new_count > 0 or not os.path.exists(output_filepath):
+        with open(output_filepath, mode="w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["date", "usd_twd_rate"])
 
-        for date_str, rate_val in merged_data:
-            writer.writerow([date_str, rate_val])
+            for date_str, rate_val in merged_data:
+                writer.writerow([date_str, rate_val])
 
-    print(f"【成功儲存】檔案已更新：{output_filepath}")
+        print(f"【成功儲存】檔案已更新：{output_filepath}")
+    else:
+        print("【提示】沒有發現新資料，CSV 檔案保持不變，未進行覆寫。")
 
+    # 顯示終端機統計資訊 (使用 time 模組)
+    formatted_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print(f"===== Download TWD 已執行完成 {formatted_time} =====\n")
 
 if __name__ == "__main__":
     main()
