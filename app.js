@@ -11,11 +11,19 @@ function formatCurrencyName(str) {
 }
 
 function fetchCSVLastModified() {
-  fetch('rate_merge.csv', { method: 'HEAD' })
-    .then(response => {
-      const lastModified = response.headers.get('Last-Modified');
-      if (lastModified) {
-        const d = new Date(lastModified);
+  const owner = 'JayHuang1989';
+  const repo = 'ExchangeRate';
+  const filePath = 'rate_merge.csv';
+  
+  const url = `https://api.github.com/repos/${owner}/${repo}/commits?path=${filePath}&per_page=1`;
+  
+  fetch(url)
+    .then(response => response.json())
+    .then(commits => {
+      if (commits.length > 0) {
+        // 取得提交時間
+        const commitTime = commits[0].commit.committer.date;
+        const d = new Date(commitTime);
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -26,7 +34,8 @@ function fetchCSVLastModified() {
         document.getElementById('dataStatus').innerText = `資料已載入`;
       }
     })
-    .catch(() => {
+    .catch(error => {
+      console.error('獲取 GitHub 提交信息失敗:', error);
       document.getElementById('dataStatus').innerText = `資料已載入`;
     });
 }
