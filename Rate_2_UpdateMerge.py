@@ -65,7 +65,7 @@ def read_rate_file(filepath):
 def read_existing_merged(filepath):
     """
     讀取既有的 rate_merge.csv，保留歷史合併資料
-    格式：{ "yyyy/mm/dd": {"twd": rate, "cny": rate, "php": rate, "cny_twd": rate, "php_twd": rate, "cny_note": note} }
+    格式：{ "yyyy/mm/dd": {"twd": rate, "cny": rate, "php": rate, "cny_twd": rate, "php_twd": rate, "note_cny": note} }
     """
     data = {}
     if not os.path.exists(filepath):
@@ -84,7 +84,7 @@ def read_existing_merged(filepath):
                     php_val = row[3].strip() if len(row) > 3 else ""
                     cny_twd_val = row[4].strip() if len(row) > 4 else ""
                     php_twd_val = row[5].strip() if len(row) > 5 else ""
-                    cny_note_val = row[6].strip() if len(row) > 6 else ""
+                    note_cny_val = row[6].strip() if len(row) > 6 else ""
 
                     data[std_date] = {
                         "twd": twd_val,
@@ -92,7 +92,7 @@ def read_existing_merged(filepath):
                         "php": php_val,
                         "cny_twd": cny_twd_val,
                         "php_twd": php_twd_val,
-                        "cny_note": cny_note_val,
+                        "note_cny": note_cny_val,
                     }
 
     print(f"-> 成功載入既有合併檔 {os.path.basename(filepath)}：共 {len(data)} 筆歷史資料")
@@ -198,7 +198,7 @@ def main():
         if d not in merged_records:
             merged_records[d] = {
                 "twd": "", "cny": "", "php": "",
-                "cny_twd": "", "php_twd": "", "cny_note": ""
+                "cny_twd": "", "php_twd": "", "note_cny": ""
             }
             has_changed = True
             new_added_count += 1
@@ -239,7 +239,7 @@ def main():
     if last_twd_date:
         twd_month_end_set.add(last_twd_date)
 
-    # 6. 計算折算匯率 (CNY:TWD, PHP:TWD) 與 CNY_NOTE
+    # 6. 計算折算匯率 (CNY:TWD, PHP:TWD) 與 note_cny
     for d in twd_dates:
         # 年月條件過濾：僅處理指定年月(含)之後的資料
         if d[:7] < START_YEAR_MONTH:
@@ -257,20 +257,20 @@ def main():
             d, full_cny, is_cny=True, is_twd_month_end=is_month_end
         )
         new_cny_twd = ""
-        new_cny_note = ""
+        new_note_cny = ""
 
         if cny_rate and cny_rate > 0:
             new_cny_twd = f"{(usd_twd / cny_rate):.8f}"
             # 若採用的日期非當日資料，註明借調資訊
             if cny_used_date != d:
-                new_cny_note = f"{cny_used_date}@{cny_raw_rate}"
+                new_note_cny = f"{cny_used_date}@{cny_raw_rate}"
 
         if merged_records[d].get("cny_twd") != new_cny_twd:
             merged_records[d]["cny_twd"] = new_cny_twd
             has_changed = True
 
-        if merged_records[d].get("cny_note") != new_cny_note:
-            merged_records[d]["cny_note"] = new_cny_note
+        if merged_records[d].get("note_cny") != new_note_cny:
+            merged_records[d]["note_cny"] = new_note_cny
             has_changed = True
 
         # ---------------- PHP:TWD 折算 ----------------
@@ -293,8 +293,8 @@ def main():
     if has_changed:
         with open(file_merge, mode="w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f)
-            # 表頭新增 cny_twd, php_twd, cny_note
-            writer.writerow(["date", "usd_twd", "usd_cny", "usd_php", "cny_twd", "php_twd", "cny_note"])
+            # 表頭新增 cny_twd, php_twd, note_cny
+            writer.writerow(["date", "usd_twd", "usd_cny", "usd_php", "cny_twd", "php_twd", "note_cny"])
 
             for d in sorted_dates:
                 writer.writerow([
@@ -304,7 +304,7 @@ def main():
                     merged_records[d].get("php", ""),
                     merged_records[d].get("cny_twd", ""),
                     merged_records[d].get("php_twd", ""),
-                    merged_records[d].get("cny_note", ""),
+                    merged_records[d].get("note_cny", ""),
                 ])
 
         print(f"【合併成功】既有資料 {existing_count} 筆，本次新增 {new_added_count} 筆，合併後 {total_count} 筆")

@@ -88,7 +88,9 @@ function loadCSVDatabase() {
 
 function initData(data, fields) {
   dateColName = fields[0];
-  currencyCols = fields.slice(1);
+
+  // 排除第 1 欄(日期)以及表頭名稱包含 "note" 的備註欄位
+  currencyCols = fields.slice(1).filter(col => !col.toLowerCase().includes('note'));
 
   currencyDisplayNames = {};
   currencyCols.forEach(col => {
