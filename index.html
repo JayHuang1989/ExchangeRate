@@ -417,6 +417,12 @@
       font-weight: 700;
     }
 
+    /* 不存在日期的橫槓：置中顯示且暗灰色 */
+    .cell-dash {
+      text-align: center !important;
+      color: #4b5563;
+    }
+
     .matrix-table tbody tr.stat-days-row td {
       background: #141b29;
       font-weight: 600;
@@ -589,7 +595,6 @@
           <table class="matrix-table" id="yearMatrixTable">
             <thead>
               <tr>
-                <!-- 左上角由 JS 動態填入，預設保留標籤 -->
                 <th id="thMatrixYearHeader">年份</th>
                 <th>1月</th><th>2月</th><th>3月</th><th>4月</th>
                 <th>5月</th><th>6月</th><th>7月</th><th>8月</th>

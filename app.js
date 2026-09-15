@@ -454,7 +454,6 @@ function renderYearMatrix() {
   const dispName = currencyDisplayNames[activeCurrency];
   document.getElementById('matrixYearTitle').innerText = `${year}年匯率統計表(${dispName})`;
 
-  // 將表格左上角更新為「YYYY年」
   const thHeader = document.getElementById('thMatrixYearHeader');
   if (thHeader) {
     thHeader.innerText = `${year}年`;
@@ -472,6 +471,19 @@ function renderYearMatrix() {
     if (y === year - 1) prevYearMap[key] = r[activeCurrency];
   });
 
+  // 1. 找出當年「最後一個有資料的月份」(例如 9 月)
+  let maxActiveMonthThisYear = 0;
+  for (let m = 1; m <= 12; m++) {
+    const monStr = String(m).padStart(2, '0');
+    for (let d = 1; d <= 31; d++) {
+      const dayStr = String(d).padStart(2, '0');
+      if (currYearMap[`${monStr}-${dayStr}`] !== undefined) {
+        maxActiveMonthThisYear = Math.max(maxActiveMonthThisYear, m);
+      }
+    }
+  }
+
+  // 2. 記錄每個月最後一個有資料的日期 key (用於標註黃色)
   const lastActiveKeyPerMonth = {};
   for (let m = 1; m <= 12; m++) {
     const monStr = String(m).padStart(2, '0');
@@ -485,6 +497,7 @@ function renderYearMatrix() {
     }
   }
 
+  // 3. 填入 1~31 日主體
   const tbody = document.getElementById('matrixTableBody');
   let rowsHtml = '';
 
@@ -498,7 +511,8 @@ function renderYearMatrix() {
       const maxDays = getDaysInMonth(year, m);
 
       if (d > maxDays) {
-        rowsHtml += `<td style="color: #4b5563;">-</td>`;
+        // 使用行內樣式強制置中
+        rowsHtml += `<td style="text-align: center !important; color: #4b5563;">-</td>`;
       } else {
         const val = currYearMap[key];
         if (val !== undefined) {
@@ -512,7 +526,8 @@ function renderYearMatrix() {
     rowsHtml += `</tr>`;
   }
 
-  const calcStats = (yearMap, targetYear) => {
+  // 4. 計算月度與累積指標
+  const calcStats = (yearMap, targetYear, isCurrentYear = true) => {
     const monthlyAvgs = [];
     const cumAvgs = [];
     const monthDays = [];
@@ -536,23 +551,31 @@ function renderYearMatrix() {
         }
       }
 
+      // 當月天數與當月平均
       monthDays.push(mCount);
-      totalCumCount += mCount;
-      cumDays.push(totalCumCount);
-
       const mAvg = mCount > 0 ? (mSum / mCount) : null;
       monthlyAvgs.push(mAvg);
 
       totalCumSum += mSum;
-      const cAvg = totalCumCount > 0 ? (totalCumSum / totalCumCount) : null;
-      cumAvgs.push(cAvg);
+      totalCumCount += mCount;
+
+      // 關鍵判定：如果月份大於當年最新有資料的月份，則「今年天數」與「累計平均」強制留空
+      if (isCurrentYear && (m > maxActiveMonthThisYear || mCount === 0 && totalCumCount === 0)) {
+        cumDays.push(null);
+        cumAvgs.push(null);
+      } else {
+        cumDays.push(totalCumCount > 0 ? totalCumCount : null);
+        const cAvg = totalCumCount > 0 ? (totalCumSum / totalCumCount) : null;
+        cumAvgs.push(cAvg);
+      }
     }
     return { monthlyAvgs, cumAvgs, monthDays, cumDays };
   };
 
-  const currStats = calcStats(currYearMap, year);
-  const prevStats = calcStats(prevYearMap, year - 1);
+  const currStats = calcStats(currYearMap, year, true);
+  const prevStats = calcStats(prevYearMap, year - 1, false);
 
+  // 當月天數與今年天數行
   rowsHtml += `
     <tr class="stat-days-row">
       <td>當月天數</td>
@@ -560,12 +583,12 @@ function renderYearMatrix() {
     </tr>
     <tr class="stat-days-row">
       <td>今年天數</td>
-      ${currStats.cumDays.map(days => `<td>${days > 0 ? days : ''}</td>`).join('')}
+      ${currStats.cumDays.map(days => `<td>${days !== null && days > 0 ? days : ''}</td>`).join('')}
     </tr>
   `;
   tbody.innerHTML = rowsHtml;
 
-  // 底部統計：確實更名為「當月平均」、「累計平均」、「去年同月」、「去年累計」
+  // 底部統計
   const tfoot = document.getElementById('matrixTableFoot');
   tfoot.innerHTML = `
     <tr class="highlight-stat">
