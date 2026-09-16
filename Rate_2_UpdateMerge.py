@@ -2,10 +2,12 @@
 import csv
 import os
 import re
+import calendar
 from datetime import datetime
 
 # ==================== 參數設定常數 ====================
 START_YEAR_MONTH = "2016/01"  # 僅處理此年月(含)之後的折算匯率，格式: YYYY/MM
+MONTH_END_BUFFER_DAYS = 3     # 最新月份距離日曆月底 N 天以內，才視為潛在月底日 (避免月中誤觸發)
 # ====================================================
 
 
@@ -229,15 +231,28 @@ def main():
 
     current_group_ym = None
     last_twd_date = None
+
     for d in twd_dates:
         ym = d[:7]
         if ym != current_group_ym:
+            # 歷史月份：跨月時，上一月的最後一筆必定是月底日
             if last_twd_date:
                 twd_month_end_set.add(last_twd_date)
             current_group_ym = ym
         last_twd_date = d
+
+    # 針對「最新月份」的最後一筆資料進行 N 日判定
     if last_twd_date:
-        twd_month_end_set.add(last_twd_date)
+        dt = datetime.strptime(last_twd_date, "%Y/%m/%d")
+        # 取得該月日曆天數 (例如 9 月有 30 天，cal_month_end 為 30)
+        _, cal_month_end = calendar.monthrange(dt.year, dt.month)
+        
+        # 距離日曆月底的天數 (例如 9/30 為 0 天，9/28 為 2 天)
+        days_to_calendar_end = cal_month_end - dt.day
+
+        # 僅在進入月底緩衝天數內，才將當前最新資料視為月底日
+        if days_to_calendar_end <= MONTH_END_BUFFER_DAYS:
+            twd_month_end_set.add(last_twd_date)
 
     # 6. 計算折算匯率 (CNY:TWD, PHP:TWD) 與 note_cny
     for d in twd_dates:
