@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>匯率查詢系統</title>
+  <title>匯率查詢與走勢分析系統</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
@@ -18,6 +18,7 @@
       --accent-green: #00f2a9;
       --accent-gold: #ffb800;
       --accent-red: #ff5c8a;
+      --accent-purple: #c084fc;
       --btn-bg: #1e293b;
       --btn-hover: #334155;
     }
@@ -84,7 +85,36 @@
       border: 1px solid #184b36;
     }
 
-    /* 幣別單選按鈕群組 */
+    /* Tab 導覽列（移至最上方） */
+    .tab-navigation {
+      display: flex;
+      gap: 6px;
+      border-bottom: 2px solid var(--border-color);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom: 2px solid var(--accent-blue);
+      background: var(--bg-card);
+    }
+
+    /* 單選與多選幣別卡片 */
     .currency-selector-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
@@ -104,12 +134,13 @@
       letter-spacing: 0.5px;
     }
 
-    .currency-radio-group {
+    .currency-group {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
     }
 
+    /* 單選樣式 */
     .circle-radio-label {
       display: inline-flex;
       align-items: center;
@@ -123,11 +154,7 @@
       transition: all 0.2s ease;
       user-select: none;
     }
-
-    .circle-radio-label:hover {
-      border-color: var(--accent-blue);
-    }
-
+    .circle-radio-label:hover { border-color: var(--accent-blue); }
     .circle-radio-label input[type="radio"] {
       appearance: none;
       width: 14px;
@@ -138,11 +165,7 @@
       position: relative;
       cursor: pointer;
     }
-
-    .circle-radio-label input[type="radio"]:checked {
-      border-color: var(--accent-blue);
-    }
-
+    .circle-radio-label input[type="radio"]:checked { border-color: var(--accent-blue); }
     .circle-radio-label input[type="radio"]:checked::after {
       content: "";
       position: absolute;
@@ -154,38 +177,50 @@
       left: 50%;
       transform: translate(-50%, -50%);
     }
-
     .circle-radio-label.active {
       border-color: var(--accent-blue);
       background: rgba(0, 210, 255, 0.08);
       color: #fff;
     }
 
-    /* Tab 導覽 */
-    .tab-navigation {
-      display: flex;
-      gap: 6px;
-      border-bottom: 2px solid var(--border-color);
-    }
-
-    .tab-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      padding: 10px 22px;
-      font-size: 0.95rem;
-      font-weight: 600;
+    /* 多選 Checkbox 樣式 */
+    .checkbox-pill-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       cursor: pointer;
-      border-radius: 8px 8px 0 0;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: all 0.2s;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 24px;
+      font-size: 0.88rem;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .checkbox-pill-label:hover { border-color: var(--accent-blue); }
+    .checkbox-pill-label input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-blue);
+      width: 15px;
+      height: 15px;
+    }
+    .checkbox-pill-label.active {
+      border-color: var(--accent-blue);
+      background: rgba(0, 210, 255, 0.12);
+      color: #fff;
     }
 
-    .tab-btn.active {
-      color: var(--accent-blue);
-      border-bottom: 2px solid var(--accent-blue);
-      background: var(--bg-card);
+    /* 說明橫幅 */
+    .info-banner {
+      background: rgba(0, 210, 255, 0.05);
+      border: 1px dashed rgba(0, 210, 255, 0.3);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     /* 控制面板 */
@@ -221,10 +256,7 @@
       font-size: 0.9rem;
       outline: none;
     }
-
-    input[type="date"]:focus, select:focus {
-      border-color: var(--accent-blue);
-    }
+    input[type="date"]:focus, select:focus { border-color: var(--accent-blue); }
 
     .btn-row {
       display: flex;
@@ -250,24 +282,10 @@
       border-color: var(--accent-blue);
     }
 
-    button.btn.primary {
-      background: #0052cc;
-      border-color: #0065ff;
-    }
-
-    button.btn.primary:hover {
-      background: #0065ff;
-    }
-
-    button.btn.export {
-      background: #113426;
-      border-color: #1b5e3f;
-      color: var(--accent-green);
-    }
-
-    button.btn.export:hover {
-      background: #184b36;
-    }
+    button.btn.primary { background: #0052cc; border-color: #0065ff; }
+    button.btn.primary:hover { background: #0065ff; }
+    button.btn.export { background: #113426; border-color: #1b5e3f; color: var(--accent-green); }
+    button.btn.export:hover { background: #184b36; }
 
     /* 單排自適應指標容器 */
     .summary-grid-single-row {
@@ -315,9 +333,7 @@
       text-overflow: ellipsis;
     }
 
-    .quarter-stat-value {
-      color: var(--accent-blue) !important;
-    }
+    .quarter-stat-value { color: var(--accent-blue) !important; }
 
     /* 圖表容器 */
     .chart-container {
@@ -326,17 +342,15 @@
       border-radius: 12px;
       padding: 16px;
       position: relative;
-      height: 380px;
+      height: 420px;
     }
 
-    /* 表格包覆卡片 (固定 title) */
-    .matrix-card {
+    /* 表格包覆卡片 */
+    .matrix-card, .tab1-table-card {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }
 
     .matrix-title {
@@ -346,20 +360,12 @@
       padding: 14px 18px;
       background: #161e2e;
       border-bottom: 1px solid var(--border-color);
-      width: 100%;
     }
 
     .table-container {
       overflow: auto;
       max-height: 520px;
       width: 100%;
-    }
-
-    .tab1-table-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      overflow: hidden;
     }
 
     table {
@@ -388,21 +394,14 @@
       white-space: nowrap;
     }
 
-    tr:hover td {
-      background: var(--bg-card-hover);
-    }
+    tr:hover td { background: var(--bg-card-hover); }
 
-    /* 年度表格樣式 */
-    .matrix-table {
-      text-align: right;
-    }
-
+    /* 年度表格專用 */
     .matrix-table th, .matrix-table td {
       padding: 6px 10px;
       font-size: 0.82rem;
       text-align: right;
     }
-
     .matrix-table th:first-child, .matrix-table td:first-child {
       text-align: center;
       position: sticky;
@@ -412,41 +411,12 @@
       z-index: 3;
     }
 
-    .last-valid-rate {
-      color: var(--accent-gold) !important;
-      font-weight: 700;
-    }
-
-    /* 不存在日期的橫槓：置中顯示且暗灰色 */
-    .cell-dash {
-      text-align: center !important;
-      color: #4b5563;
-    }
-
-    .matrix-table tbody tr.stat-days-row td {
-      background: #141b29;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-
-    .matrix-table tbody tr.stat-days-row td:first-child {
-      background: #182234;
-      color: var(--accent-blue);
-    }
-
-    .matrix-table tfoot td {
-      font-weight: 600;
-      background: #121b2b;
-      border-top: 1px solid var(--border-color);
-    }
-
-    .matrix-table tfoot tr.highlight-stat td {
-      color: var(--accent-green);
-    }
-
-    .matrix-table tfoot tr.last-year-stat td {
-      color: #b0c4de;
-    }
+    .last-valid-rate { color: var(--accent-gold) !important; font-weight: 700; }
+    .matrix-table tbody tr.stat-days-row td { background: #141b29; font-weight: 600; color: var(--text-main); }
+    .matrix-table tbody tr.stat-days-row td:first-child { background: #182234; color: var(--accent-blue); }
+    .matrix-table tfoot td { font-weight: 600; background: #121b2b; border-top: 1px solid var(--border-color); }
+    .matrix-table tfoot tr.highlight-stat td { color: var(--accent-green); }
+    .matrix-table tfoot tr.last-year-stat td { color: #b0c4de; }
 
     .tab-content {
       display: none;
@@ -454,9 +424,7 @@
       gap: 16px;
     }
 
-    .tab-content.active {
-      display: flex;
-    }
+    .tab-content.active { display: flex; }
 
     #loadingOverlay {
       position: fixed;
@@ -471,28 +439,11 @@
       font-weight: 600;
     }
 
-    @media (max-width: 650px) {
-      .summary-grid-single-row {
-        gap: 6px;
-      }
-      .summary-grid-single-row .stat-card {
-        padding: 8px 4px;
-      }
-      .summary-grid-single-row .stat-card .label {
-        font-size: 0.68rem;
-      }
-      .summary-grid-single-row .stat-card .value {
-        font-size: 0.95rem;
-      }
-      .summary-grid-single-row .stat-card .sub-date {
-        font-size: 0.62rem;
-      }
-      .chart-container {
-        height: 280px;
-      }
-      .controls {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 768px) {
+      .summary-grid-single-row { flex-wrap: wrap; }
+      .summary-grid-single-row .stat-card { flex: 1 1 45%; }
+      .chart-container { height: 300px; }
+      .controls { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -506,20 +457,21 @@
       <span class="badge" id="dataStatus">檢查資料時間...</span>
     </header>
 
-    <!-- 幣別圓形選擇器 -->
-    <div class="currency-selector-card">
-      <span class="selector-title">幣別切換：</span>
-      <div class="currency-radio-group" id="currencyRadioGroup"></div>
-    </div>
-
-    <!-- 分頁導航 -->
+    <!-- 4 個 Tab 在最頂層 -->
     <div class="tab-navigation">
       <button class="tab-btn active" data-tab="tab1">匯率查詢</button>
       <button class="tab-btn" data-tab="tab2">年度統計</button>
+      <button class="tab-btn" data-tab="tab3">基期指數化走勢 (Base 100)</button>
+      <button class="tab-btn" data-tab="tab4">累積漲跌幅走勢 (%)</button>
     </div>
 
-    <!-- TAB 1: 匯率查詢 -->
+    <!-- TAB 1: 單一匯率查詢 -->
     <div class="tab-content active" id="tab1">
+      <div class="currency-selector-card">
+        <span class="selector-title">選擇幣別：</span>
+        <div class="currency-group" id="currencyRadioGroupTab1"></div>
+      </div>
+
       <div class="controls">
         <div class="control-group">
           <label>開始日期</label>
@@ -547,15 +499,12 @@
         </div>
       </div>
 
-      <!-- 4 欄統計卡片 -->
       <div class="summary-grid-single-row" id="tab1SummaryGrid"></div>
 
-      <!-- 走勢圖 -->
       <div class="chart-container">
         <canvas id="fxChart"></canvas>
       </div>
 
-      <!-- 歷史明細表格 -->
       <div class="tab1-table-card">
         <div class="table-container">
           <table>
@@ -573,6 +522,11 @@
 
     <!-- TAB 2: 年度統計 -->
     <div class="tab-content" id="tab2">
+      <div class="currency-selector-card">
+        <span class="selector-title">選擇幣別：</span>
+        <div class="currency-group" id="currencyRadioGroupTab2"></div>
+      </div>
+
       <div class="controls">
         <div class="control-group" style="max-width: 250px;">
           <label>選擇年度</label>
@@ -585,10 +539,8 @@
         </div>
       </div>
 
-      <!-- 四季平均匯率卡片 (亮藍色) -->
       <div class="summary-grid-single-row" id="tab2QuarterGrid"></div>
 
-      <!-- 獨立固定標題卡片 -->
       <div class="matrix-card">
         <div class="matrix-title" id="matrixYearTitle">匯率統計表</div>
         <div class="table-container">
@@ -607,6 +559,91 @@
         </div>
       </div>
     </div>
+
+    <!-- TAB 3: 基期指數化走勢 (Base 100) -->
+    <div class="tab-content" id="tab3">
+      <div class="currency-selector-card">
+        <span class="selector-title">勾選比較幣別 (原始 USD 匯率)：</span>
+        <div class="currency-group" id="compareCheckboxGroupTab3"></div>
+      </div>
+
+      <div class="info-banner" id="commonPeriodInfoTab3">
+        ⓘ 說明：起點日統一指數化為 100。數值 105 代表相較起點美元升值 5%（非美貨幣貶值 5%）。
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label>共同區間開始</label>
+          <input type="date" id="tab3StartDate">
+        </div>
+        <div class="control-group">
+          <label>共同區間結束</label>
+          <input type="date" id="tab3EndDate">
+        </div>
+        <div class="control-group">
+          <label>快速區間縮小</label>
+          <select id="tab3QuickFilter">
+            <option value="all">全部共同重疊期間</option>
+            <option value="365">最近 1 年</option>
+            <option value="1095">最近 3 年</option>
+            <option value="1825">最近 5 年</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <div class="btn-row">
+            <button class="btn primary" id="btnFilterTab3">套用區間</button>
+            <button class="btn export" id="btnExportTab3">下載比較 CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container" style="height: 480px;">
+        <canvas id="indexedChart"></canvas>
+      </div>
+    </div>
+
+    <!-- TAB 4: 累積漲跌幅百分比走勢 (%) -->
+    <div class="tab-content" id="tab4">
+      <div class="currency-selector-card">
+        <span class="selector-title">勾選比較幣別 (原始 USD 匯率)：</span>
+        <div class="currency-group" id="compareCheckboxGroupTab4"></div>
+      </div>
+
+      <div class="info-banner" id="commonPeriodInfoTab4">
+        ⓘ 說明：以起點日為 0%，顯示各幣別對美元累計升貶幅。正值代表該匯率上升（美元走強），負值代表匯率下降。
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label>共同區間開始</label>
+          <input type="date" id="tab4StartDate">
+        </div>
+        <div class="control-group">
+          <label>共同區間結束</label>
+          <input type="date" id="tab4EndDate">
+        </div>
+        <div class="control-group">
+          <label>快速區間縮小</label>
+          <select id="tab4QuickFilter">
+            <option value="all">全部共同重疊期間</option>
+            <option value="365">最近 1 年</option>
+            <option value="1095">最近 3 年</option>
+            <option value="1825">最近 5 年</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <div class="btn-row">
+            <button class="btn primary" id="btnFilterTab4">套用區間</button>
+            <button class="btn export" id="btnExportTab4">下載比較 CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container" style="height: 480px;">
+        <canvas id="pctChangeChart"></canvas>
+      </div>
+    </div>
+
   </div>
 
   <script src="app.js"></script>
