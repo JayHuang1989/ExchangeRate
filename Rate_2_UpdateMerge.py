@@ -101,7 +101,7 @@ def read_existing_merged(filepath):
     return data
 
 
-def resolve_foreign_rate(target_date, foreign_records, is_cny=False, is_twd_month_end=False):
+def resolve_foreign_rate(target_date, foreign_records, is_cny=False, is_twd_month_end=False, allow_borrow=True):
     """
     依原則尋找外幣匯率：
     回傳 (匯率 float, 實際採用日期 str, 匯率原始字串 str)
@@ -128,6 +128,10 @@ def resolve_foreign_rate(target_date, foreign_records, is_cny=False, is_twd_mont
             return float(rate_str), target_date, rate_str
         except ValueError:
             pass
+
+    # PHP 等不適用借調規則的幣別：找不到同日資料就直接回傳空，不往前後候接。
+    if not allow_borrow:
+        return None, None, None
 
     # 原則 1: 同月前日優先
     same_month_earlier = [
@@ -289,8 +293,9 @@ def main():
             has_changed = True
 
         # ---------------- PHP:TWD 折算 ----------------
+        # PHP:TWD 僅採同日匯率，不適用月底日強採或候接規則
         php_rate, _, _ = resolve_foreign_rate(
-            d, full_php, is_cny=False, is_twd_month_end=False
+            d, full_php, is_cny=False, is_twd_month_end=False, allow_borrow=False
         )
         new_php_twd = ""
         if php_rate and php_rate > 0:
