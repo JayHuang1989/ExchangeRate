@@ -385,7 +385,14 @@ function renderTab1Chart() {
           titleColor: '#00d2ff',
           bodyColor: '#fff',
           borderColor: '#232f46',
-          borderWidth: 1
+          borderWidth: 1,
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y;
+              return `${label}: ${value !== null ? value.toFixed(4) : ''}`;
+            }
+          }
         }
       },
       scales: {
