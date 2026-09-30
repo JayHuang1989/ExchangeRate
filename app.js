@@ -22,6 +22,14 @@ const CURRENCY_COLORS = {
 };
 const FALLBACK_COLORS = ['#ffb800', '#c084fc', '#38bdf8', '#fb923c'];
 
+// 模擬 Excel ROUND 運算（加入 EPSILON 防止浮點微小下溢導致 .5 捨去）
+function roundFixed(num, decimals = 4) {
+  if (num === null || num === undefined || isNaN(num)) return '';
+  const factor = Math.pow(10, decimals);
+  // 加 Number.EPSILON 可校正 31.716349999999996 此類微小浮點數誤差
+  return (Math.round((Number(num) + Number.EPSILON) * factor) / factor).toFixed(decimals);
+}
+
 function formatCurrencyName(str) {
   return String(str).trim().toUpperCase().replace(/_/g, ':');
 }
@@ -69,7 +77,6 @@ function setupTabs() {
       const targetId = btn.dataset.tab;
       document.getElementById(targetId).classList.add('active');
 
-      // 切換時重繪對應圖表，避免尺寸跑版
       if (targetId === 'tab1' && chartInstanceTab1) {
         chartInstanceTab1.resize();
       } else if (targetId === 'tab2') {
@@ -176,7 +183,6 @@ function renderCurrencyRadios(containerId) {
 
     label.querySelector('input').addEventListener('change', () => {
       activeCurrency = col;
-      // 同步所有單選按鈕組的狀態
       document.querySelectorAll('.circle-radio-label').forEach(el => {
         const input = el.querySelector('input');
         if (input && input.value === col) {
@@ -267,26 +273,28 @@ function renderTab1SummaryCards() {
     return;
   }
 
-  let sum = 0;
+  // 轉為整數累加，消除浮點累加殘差
+  let sumScaled = 0;
   let maxItem = currentTab1Data[0];
   let minItem = currentTab1Data[0];
 
   currentTab1Data.forEach(item => {
     const val = item[activeCurrency];
-    sum += val;
+    sumScaled += Math.round(val * 10000);
     if (val > maxItem[activeCurrency]) maxItem = item;
     if (val < minItem[activeCurrency]) minItem = item;
   });
 
-  const avg = (sum / currentTab1Data.length).toFixed(4);
+  const exactSum = sumScaled / 10000;
+  const avg = roundFixed(exactSum / currentTab1Data.length, 4);
   const latestItem = currentTab1Data[currentTab1Data.length - 1];
   const formatSlashDate = (str) => str.replace(/-/g, '/');
 
   const cardsData = [
-    { label: '最新匯率', val: latestItem[activeCurrency].toFixed(4), sub: formatSlashDate(latestItem[dateColName]), color: 'var(--accent-blue)' },
+    { label: '最新匯率', val: roundFixed(latestItem[activeCurrency], 4), sub: formatSlashDate(latestItem[dateColName]), color: 'var(--accent-blue)' },
     { label: '區間平均匯率', val: avg, sub: `共 ${currentTab1Data.length} 個營業日`, color: 'var(--text-main)' },
-    { label: '區間最高匯率', val: maxItem[activeCurrency].toFixed(4), sub: formatSlashDate(maxItem[dateColName]), color: 'var(--accent-green)' },
-    { label: '區間最低匯率', val: minItem[activeCurrency].toFixed(4), sub: formatSlashDate(minItem[dateColName]), color: 'var(--accent-red)' }
+    { label: '區間最高匯率', val: roundFixed(maxItem[activeCurrency], 4), sub: formatSlashDate(maxItem[dateColName]), color: 'var(--accent-green)' },
+    { label: '區間最低匯率', val: roundFixed(minItem[activeCurrency], 4), sub: formatSlashDate(minItem[dateColName]), color: 'var(--accent-red)' }
   ];
 
   cardsData.forEach(card => {
@@ -312,8 +320,9 @@ function renderTab1Chart() {
 
   let maxVal = Math.max(...values);
   let minVal = Math.min(...values);
-  let sum = values.reduce((a, b) => a + b, 0);
-  const avgVal = parseFloat((sum / values.length).toFixed(4));
+  let sumScaled = values.reduce((a, b) => a + Math.round(b * 10000), 0);
+  const exactSum = sumScaled / 10000;
+  const avgVal = parseFloat(roundFixed(exactSum / values.length, 4));
   const avgLineData = new Array(values.length).fill(avgVal);
   const isApproxEqual = (a, b) => Math.abs(a - b) < 0.00001;
 
@@ -363,7 +372,7 @@ function renderTab1Chart() {
           order: 1
         },
         {
-          label: `平均匯率 (${avgVal})`,
+          label: `平均匯率 (${avgVal.toFixed(4)})`,
           data: avgLineData,
           borderColor: 'rgba(255, 255, 255, 0.65)',
           borderWidth: 1.5,
@@ -390,7 +399,7 @@ function renderTab1Chart() {
             label: function(context) {
               const label = context.dataset.label || '';
               const value = context.parsed.y;
-              return `${label}: ${value !== null ? value.toFixed(4) : ''}`;
+              return `${label}: ${value !== null ? roundFixed(value, 4) : ''}`;
             }
           }
         }
@@ -409,7 +418,7 @@ function renderTab1Table() {
   tbody.innerHTML = reversed.map(r => `
     <tr>
       <td>${r[dateColName].replace(/-/g, '/')}</td>
-      <td>${r[activeCurrency] !== null ? r[activeCurrency].toFixed(4) : ''}</td>
+      <td>${r[activeCurrency] !== null ? roundFixed(r[activeCurrency], 4) : ''}</td>
     </tr>
   `).join('');
 }
@@ -444,10 +453,7 @@ function renderCompareCheckboxes(containerId, tabNum) {
         selectedUsdCols = selectedUsdCols.filter(c => c !== val);
       }
 
-      // 同步 Tab 3 與 Tab 4 的 Checkbox UI
       syncCompareCheckboxesUI();
-
-      // 重新計算共同重疊期間並更新圖表
       updateCommonPeriod(3, true);
       updateCommonPeriod(4, true);
     });
@@ -469,7 +475,6 @@ function syncCompareCheckboxesUI() {
   });
 }
 
-// 取得所勾選幣別共同「均有非 null 資料」的子陣列
 function getCommonValidRecords() {
   if (selectedUsdCols.length === 0) return [];
   return rawData.filter(row => {
@@ -477,7 +482,6 @@ function getCommonValidRecords() {
   });
 }
 
-// 更新指定 Tab 的共同日期極限並設定預設日期
 function updateCommonPeriod(tabNum, resetToFull = false) {
   const commonData = getCommonValidRecords();
   const infoEl = document.getElementById(`commonPeriodInfoTab${tabNum}`);
@@ -541,17 +545,17 @@ function renderTab3IndexedChart() {
   if (commonData.length === 0) return;
 
   const labels = commonData.map(r => r[dateColName]);
-  const baseRow = commonData[0]; // 起點日
+  const baseRow = commonData[0];
 
   const datasets = selectedUsdCols.map((col, idx) => {
     const baseVal = baseRow[col];
     const colorObj = CURRENCY_COLORS[col] || { line: FALLBACK_COLORS[idx % FALLBACK_COLORS.length], bg: 'transparent' };
     const indexedValues = commonData.map(r => {
-      return parseFloat(((r[col] / baseVal) * 100).toFixed(2));
+      return parseFloat(roundFixed((r[col] / baseVal) * 100, 2));
     });
 
     return {
-      label: `${currencyDisplayNames[col]} (起點匯率 ${baseVal.toFixed(4)})`,
+      label: `${currencyDisplayNames[col]} (起點匯率 ${roundFixed(baseVal, 4)})`,
       data: indexedValues,
       borderColor: colorObj.line,
       backgroundColor: 'transparent',
@@ -578,7 +582,7 @@ function renderTab3IndexedChart() {
           borderColor: '#232f46',
           borderWidth: 1,
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label.split(' ')[0]}: 指數 ${ctx.parsed.y} (${ctx.parsed.y >= 100 ? '+' : ''}${(ctx.parsed.y - 100).toFixed(2)}%)`
+            label: (ctx) => `${ctx.dataset.label.split(' ')[0]}: 指數 ${ctx.parsed.y} (${ctx.parsed.y >= 100 ? '+' : ''}${roundFixed(ctx.parsed.y - 100, 2)}%)`
           }
         }
       },
@@ -615,11 +619,11 @@ function renderTab4PctChart() {
     const colorObj = CURRENCY_COLORS[col] || { line: FALLBACK_COLORS[idx % FALLBACK_COLORS.length], bg: 'transparent' };
     const pctValues = commonData.map(r => {
       const pct = ((r[col] - baseVal) / baseVal) * 100;
-      return parseFloat(pct.toFixed(2));
+      return parseFloat(roundFixed(pct, 2));
     });
 
     return {
-      label: `${currencyDisplayNames[col]} (起點匯率 ${baseVal.toFixed(4)})`,
+      label: `${currencyDisplayNames[col]} (起點匯率 ${roundFixed(baseVal, 4)})`,
       data: pctValues,
       borderColor: colorObj.line,
       backgroundColor: 'transparent',
@@ -744,7 +748,7 @@ function renderYearMatrix() {
         const val = currYearMap[key];
         if (val !== undefined) {
           const isLast = (lastActiveKeyPerMonth[m] === key);
-          rowsHtml += `<td class="${isLast ? 'last-valid-rate' : ''}">${val.toFixed(4)}</td>`;
+          rowsHtml += `<td class="${isLast ? 'last-valid-rate' : ''}">${roundFixed(val, 4)}</td>`;
         } else {
           rowsHtml += `<td></td>`;
         }
@@ -758,29 +762,30 @@ function renderYearMatrix() {
     const cumAvgs = [];
     const monthDays = [];
     const cumDays = [];
-    let totalCumSum = 0;
+    let totalCumScaled = 0;
     let totalCumCount = 0;
 
     for (let m = 1; m <= 12; m++) {
       const monStr = String(m).padStart(2, '0');
       const maxDays = getDaysInMonth(targetYear, m);
-      let mSum = 0;
+      let mSumScaled = 0;
       let mCount = 0;
 
       for (let d = 1; d <= maxDays; d++) {
         const dayStr = String(d).padStart(2, '0');
         const v = yearMap[`${monStr}-${dayStr}`];
         if (v !== undefined) {
-          mSum += v;
+          // 放大 10000 倍以整數累加，消除單日累加微差
+          mSumScaled += Math.round(v * 10000);
           mCount++;
         }
       }
 
       monthDays.push(mCount);
-      const mAvg = mCount > 0 ? (mSum / mCount) : null;
+      const mAvg = mCount > 0 ? (mSumScaled / 10000 / mCount) : null;
       monthlyAvgs.push(mAvg);
 
-      totalCumSum += mSum;
+      totalCumScaled += mSumScaled;
       totalCumCount += mCount;
 
       if (isCurrentYear && (m > maxActiveMonthThisYear || (mCount === 0 && totalCumCount === 0))) {
@@ -788,7 +793,7 @@ function renderYearMatrix() {
         cumAvgs.push(null);
       } else {
         cumDays.push(totalCumCount > 0 ? totalCumCount : null);
-        const cAvg = totalCumCount > 0 ? (totalCumSum / totalCumCount) : null;
+        const cAvg = totalCumCount > 0 ? (totalCumScaled / 10000 / totalCumCount) : null;
         cumAvgs.push(cAvg);
       }
     }
@@ -814,19 +819,19 @@ function renderYearMatrix() {
   tfoot.innerHTML = `
     <tr class="highlight-stat">
       <td>當月平均</td>
-      ${currStats.monthlyAvgs.map(v => `<td>${v !== null ? v.toFixed(4) : ''}</td>`).join('')}
+      ${currStats.monthlyAvgs.map(v => `<td>${roundFixed(v, 4)}</td>`).join('')}
     </tr>
     <tr class="highlight-stat">
       <td>累計平均</td>
-      ${currStats.cumAvgs.map(v => `<td>${v !== null ? v.toFixed(4) : ''}</td>`).join('')}
+      ${currStats.cumAvgs.map(v => `<td>${roundFixed(v, 4)}</td>`).join('')}
     </tr>
     <tr class="last-year-stat">
       <td>去年同月</td>
-      ${prevStats.monthlyAvgs.map(v => `<td>${v !== null ? v.toFixed(4) : ''}</td>`).join('')}
+      ${prevStats.monthlyAvgs.map(v => `<td>${roundFixed(v, 4)}</td>`).join('')}
     </tr>
     <tr class="last-year-stat">
       <td>去年累計</td>
-      ${prevStats.cumAvgs.map(v => `<td>${v !== null ? v.toFixed(4) : ''}</td>`).join('')}
+      ${prevStats.cumAvgs.map(v => `<td>${roundFixed(v, 4)}</td>`).join('')}
     </tr>
   `;
 
@@ -844,7 +849,7 @@ function renderQuarterCards(yearMap, targetYear) {
   ];
 
   quarters.forEach(q => {
-    let sum = 0;
+    let sumScaled = 0;
     let count = 0;
     q.months.forEach(m => {
       const monStr = String(m).padStart(2, '0');
@@ -853,13 +858,13 @@ function renderQuarterCards(yearMap, targetYear) {
         const dayStr = String(d).padStart(2, '0');
         const v = yearMap[`${monStr}-${dayStr}`];
         if (v !== undefined) {
-          sum += v;
+          sumScaled += Math.round(v * 10000);
           count++;
         }
       }
     });
 
-    const avg = count > 0 ? (sum / count).toFixed(4) : '--';
+    const avg = count > 0 ? roundFixed(sumScaled / 10000 / count, 4) : '--';
     const card = document.createElement('div');
     card.className = 'stat-card';
     card.innerHTML = `
@@ -875,7 +880,6 @@ function renderQuarterCards(yearMap, targetYear) {
    事件綁定與 CSV 匯出
    ========================================================================= */
 function setupEventListeners() {
-  // Tab 1 事件
   document.getElementById('quickFilter').addEventListener('change', (e) => {
     if (e.target.value === 'all') {
       const validData = rawData.filter(r => r[activeCurrency] !== null);
@@ -892,11 +896,9 @@ function setupEventListeners() {
   document.getElementById('btnFilterTab1').addEventListener('click', executeTab1Filter);
   document.getElementById('btnExportTab1').addEventListener('click', exportTab1CSV);
 
-  // Tab 2 事件
   document.getElementById('yearSelector').addEventListener('change', renderYearMatrix);
   document.getElementById('btnExportTab2').addEventListener('click', exportTab2CSV);
 
-  // Tab 3 事件
   document.getElementById('tab3QuickFilter').addEventListener('change', (e) => {
     if (e.target.value === 'all') {
       updateCommonPeriod(3, true);
@@ -907,7 +909,6 @@ function setupEventListeners() {
   document.getElementById('btnFilterTab3').addEventListener('click', renderTab3IndexedChart);
   document.getElementById('btnExportTab3').addEventListener('click', () => exportCompareCSV('indexed'));
 
-  // Tab 4 事件
   document.getElementById('tab4QuickFilter').addEventListener('change', (e) => {
     if (e.target.value === 'all') {
       updateCommonPeriod(4, true);
@@ -927,7 +928,7 @@ function exportTab1CSV() {
   const dispName = currencyDisplayNames[activeCurrency];
   const exportData = currentTab1Data.map(r => ({
     "日期": r[dateColName].replace(/-/g, '/'),
-    [dispName]: r[activeCurrency]
+    [dispName]: roundFixed(r[activeCurrency], 4)
   }));
   const csv = '\uFEFF' + Papa.unparse(exportData);
   triggerDownload(csv, `${dispName.replace(/:/g, '_')}_匯率_${document.getElementById('tab1StartDate').value}_${document.getElementById('tab1EndDate').value}.csv`);
@@ -961,11 +962,11 @@ function exportCompareCSV(mode) {
       const baseVal = baseRow[col];
       const dispName = currencyDisplayNames[col];
       if (mode === 'indexed') {
-        rowObj[`${dispName}_基期指數`] = parseFloat(((r[col] / baseVal) * 100).toFixed(2));
+        rowObj[`${dispName}_基期指數`] = parseFloat(roundFixed((r[col] / baseVal) * 100, 2));
       } else {
-        rowObj[`${dispName}_累積漲跌(%)`] = parseFloat((((r[col] - baseVal) / baseVal) * 100).toFixed(2));
+        rowObj[`${dispName}_累積漲跌(%)`] = parseFloat(roundFixed(((r[col] - baseVal) / baseVal) * 100, 2));
       }
-      rowObj[`${dispName}_原始匯率`] = r[col];
+      rowObj[`${dispName}_原始匯率`] = roundFixed(r[col], 4);
     });
     return rowObj;
   });
